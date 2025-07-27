@@ -1000,9 +1000,20 @@ def create_working_main_gui():
         refresh_time_table()
     
     def create_jodi_table():
-        """Create jodi table view (unique to date+bazar)"""
-        # Date and Bazar filters
+        """Create jodi table view (unique to customer+date+bazar)"""
+        # Customer, Date and Bazar filters
         with dpg.group(horizontal=True):
+            dpg.add_text("Customer:")
+            dpg.add_combo(
+                items=["All Customers"] + [customer['name'] for customer in customers],
+                tag="jodi_customer_filter",
+                default_value="All Customers",
+                width=150,
+                callback=refresh_jodi_table
+            )
+            
+            dpg.add_spacer(width=10)
+            
             dpg.add_text("Date:")
             today = date.today()
             # Date display field with current date as default
@@ -1020,7 +1031,7 @@ def create_working_main_gui():
                 height=23
             )
             
-            dpg.add_spacer(width=20)
+            dpg.add_spacer(width=10)
             
             dpg.add_text("Bazar:")
             dpg.add_combo(
@@ -1031,7 +1042,7 @@ def create_working_main_gui():
                 callback=refresh_jodi_table
             )
             
-            dpg.add_spacer(width=20)
+            dpg.add_spacer(width=10)
             
             dpg.add_button(label="Load Data", callback=refresh_jodi_table, width=100)
             dpg.add_button(label="Export", callback=export_jodi_table, width=80)
@@ -1066,8 +1077,8 @@ def create_working_main_gui():
         
         dpg.add_separator()
         
-        # Jodi table display in grid format (unique per Date + Bazar)
-        dpg.add_text("Jodi Table Data (Unique per Date + Bazar) - Jodi Numbers 00-99:")
+        # Jodi table display in grid format (unique per Customer + Date + Bazar)
+        dpg.add_text("Jodi Table Data (Unique per Customer + Date + Bazar) - Jodi Numbers 00-99:")
         
         # Create jodi grid table - 10x10 grid arranged by tens digit columns
         with dpg.table(
@@ -1537,23 +1548,106 @@ def create_working_main_gui():
                                 dpg.add_text("Error loading data")
                                 for i in range(12):
                                     dpg.add_text("-")
+                    
+                    # Add Jodi column totals row at the bottom
+                    jodi_column_totals = _calculate_jodi_column_totals(bazar_name, date_str, customer_value)
+                    with dpg.table_row(parent="time_table"):
+                        dpg.add_text("JODI TOTALS", color=(255, 193, 7, 255))  # Yellow/gold color
+                        dpg.add_text(bazar_name, color=(255, 193, 7, 255))
+                        # Display jodi totals for columns 1-9, then 0
+                        for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]:
+                            total = jodi_column_totals.get(i, 0)
+                            if total > 0:
+                                dpg.add_text(f"₹{total:,}", color=(255, 193, 7, 255))
+                            else:
+                                dpg.add_text("-", color=(108, 117, 125, 255))
+                        # Grand total of all jodi columns
+                        grand_total = sum(jodi_column_totals.values())
+                        dpg.add_text(f"₹{grand_total:,}", color=(255, 193, 7, 255))
+                        dpg.add_text("Live", color=(255, 193, 7, 255))
                         
-                dpg.set_value("status_text", f"Time table loaded for {date_str}")
+                dpg.set_value("status_text", f"Time table loaded for {date_str} (includes Jodi totals)")
         except Exception as e:
             dpg.set_value("status_text", f"Error refreshing time table: {e}")
     
+    def _calculate_jodi_column_totals(bazar_name: str, date_str: str, customer_value: str):
+        """Calculate jodi column totals for display in time table"""
+        column_totals = {i: 0 for i in range(10)}  # Initialize columns 0-9
+        
+        try:
+            jodi_data = []  # Initialize empty list
+            if db_manager:
+                # Get jodi data based on customer selection (same logic as jodi table)
+                if customer_value == "All Customers":
+                    # Get aggregated data from jodi_table
+                    if hasattr(db_manager, 'get_jodi_table_values'):
+                        jodi_data = db_manager.get_jodi_table_values(bazar_name, date_str)
+                else:
+                    # Get customer-specific data from universal_log
+                    if hasattr(db_manager, 'get_jodi_table_values_by_customer'):
+                        jodi_data = db_manager.get_jodi_table_values_by_customer(customer_value, bazar_name, date_str)
+                
+                # Process jodi data and sum by column
+                for entry in jodi_data:
+                    if hasattr(entry, '__getitem__'):
+                        jodi_number = entry['jodi_number']
+                        value = entry['value']
+                        
+                        # Map jodi number to column based on tens digit
+                        # Jodi layout: Col 1: 11,12,13,14,15,16,17,18,19,10
+                        #              Col 2: 21,22,23,24,25,26,27,28,29,20
+                        #              ...
+                        #              Col 0: 01,02,03,04,05,06,07,08,09,00
+                        if jodi_number == 0:
+                            column = 0  # 00 goes to column 0
+                        elif 1 <= jodi_number <= 9:
+                            column = 0  # 01-09 go to column 0
+                        elif jodi_number == 10:
+                            column = 1  # 10 goes to column 1
+                        elif jodi_number == 20:
+                            column = 2  # 20 goes to column 2
+                        elif jodi_number == 30:
+                            column = 3  # 30 goes to column 3
+                        elif jodi_number == 40:
+                            column = 4  # 40 goes to column 4
+                        elif jodi_number == 50:
+                            column = 5  # 50 goes to column 5
+                        elif jodi_number == 60:
+                            column = 6  # 60 goes to column 6
+                        elif jodi_number == 70:
+                            column = 7  # 70 goes to column 7
+                        elif jodi_number == 80:
+                            column = 8  # 80 goes to column 8
+                        elif jodi_number == 90:
+                            column = 9  # 90 goes to column 9
+                        else:
+                            # For numbers like 11-19, 21-29, etc., use tens digit
+                            tens_digit = jodi_number // 10
+                            if tens_digit >= 1 and tens_digit <= 9:
+                                column = tens_digit
+                            else:
+                                continue  # Skip invalid numbers
+                        
+                        column_totals[column] += value
+                        
+        except Exception as e:
+            print(f"Error calculating jodi column totals: {e}")
+        
+        return column_totals
+    
     def refresh_jodi_table():
-        """Refresh jodi table data for selected date+bazar"""
+        """Refresh jodi table data for selected customer+date+bazar"""
         try:
             if dpg.does_item_exist("jodi_grid_table"):
                 dpg.delete_item("jodi_grid_table", children_only=True, slot=1)
                 
-                # Get selected date and bazar from display fields
+                # Get selected filters from display fields
+                customer_value = dpg.get_value("jodi_customer_filter")
                 date_str = dpg.get_value("jodi_date_display")
                 bazar_value = dpg.get_value("jodi_bazar_filter")
                 
                 if date_str and bazar_value and bazar_value != "No Bazars":
-                    # Get jodi data from database for selected date+bazar
+                    # Get jodi data from database for selected filters
                     jodi_values = {}  # jodi_number -> value mapping
                     
                     if db_manager:
@@ -1565,12 +1659,21 @@ def create_working_main_gui():
                                     bazar_name = bazar['name']
                                     break
                             
-                            # Fetch jodi data from database using new method
-                            if hasattr(db_manager, 'get_jodi_table_values'):
-                                jodi_data = db_manager.get_jodi_table_values(bazar_name, date_str)
-                                for entry in jodi_data:
-                                    if hasattr(entry, '__getitem__'):  # Row object or dict
-                                        jodi_values[entry['jodi_number']] = entry['value']
+                            # Fetch jodi data based on customer selection
+                            if customer_value == "All Customers":
+                                # Show aggregated data for all customers (existing behavior)
+                                if hasattr(db_manager, 'get_jodi_table_values'):
+                                    jodi_data = db_manager.get_jodi_table_values(bazar_name, date_str)
+                                    for entry in jodi_data:
+                                        if hasattr(entry, '__getitem__'):  # Row object or dict
+                                            jodi_values[entry['jodi_number']] = entry['value']
+                            else:
+                                # Show data for specific customer from universal_log
+                                if hasattr(db_manager, 'get_jodi_table_values_by_customer'):
+                                    jodi_data = db_manager.get_jodi_table_values_by_customer(customer_value, bazar_name, date_str)
+                                    for entry in jodi_data:
+                                        if hasattr(entry, '__getitem__'):  # Row object or dict
+                                            jodi_values[entry['jodi_number']] = entry['value']
                         except Exception as e:
                             print(f"Database error: {e}")
                     
@@ -1618,12 +1721,18 @@ def create_working_main_gui():
                     non_zero_count = len([v for v in jodi_values.values() if v > 0])
                     total_value = sum(jodi_values.values())
                     
-                    dpg.set_value("status_text", 
-                        f"Jodi table loaded for {bazar_value} | "
-                        f"Jodi numbers: {non_zero_count}/{total_jodi_numbers} active | "
-                        f"Total value: ₹{total_value:,}")
+                    if customer_value == "All Customers":
+                        dpg.set_value("status_text", 
+                            f"Jodi table loaded for All Customers in {bazar_value} | "
+                            f"Jodi numbers: {non_zero_count}/{total_jodi_numbers} active | "
+                            f"Total value: ₹{total_value:,}")
+                    else:
+                        dpg.set_value("status_text", 
+                            f"Jodi table loaded for {customer_value} in {bazar_value} | "
+                            f"Jodi numbers: {non_zero_count}/{total_jodi_numbers} active | "
+                            f"Total value: ₹{total_value:,}")
                 else:
-                    dpg.set_value("status_text", "Please select date and bazar to load Jodi table")
+                    dpg.set_value("status_text", "Please select customer, date and bazar to load Jodi table")
         except Exception as e:
             dpg.set_value("status_text", f"Error refreshing jodi table: {e}")
     

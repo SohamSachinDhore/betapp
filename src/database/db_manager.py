@@ -322,13 +322,24 @@ class DatabaseManager:
     
     # Jodi Table Operations
     def get_jodi_table_values(self, bazar: str, entry_date: str) -> List[sqlite3.Row]:
-        """Get all jodi values for a specific bazar and date"""
+        """Get all jodi values for a specific bazar and date (aggregated for all customers)"""
         query = """
         SELECT jodi_number, value FROM jodi_table
         WHERE bazar = ? AND entry_date = ?
         ORDER BY jodi_number
         """
         return self.execute_query(query, (bazar, entry_date))
+    
+    def get_jodi_table_values_by_customer(self, customer_name: str, bazar: str, entry_date: str) -> List[sqlite3.Row]:
+        """Get jodi values for a specific customer, bazar and date from universal_log"""
+        query = """
+        SELECT number as jodi_number, SUM(value) as value 
+        FROM universal_log
+        WHERE customer_name = ? AND bazar = ? AND entry_date = ? AND entry_type = 'JODI'
+        GROUP BY number
+        ORDER BY number
+        """
+        return self.execute_query(query, (customer_name, bazar, entry_date))
     
     # Time Table Operations
     def update_time_table_entry(self, customer_id: int, customer_name: str, 
