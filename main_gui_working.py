@@ -840,7 +840,40 @@ def create_working_main_gui():
             
             dpg.add_spacer(width=20)
             
+            dpg.add_text("Upper Filter:")
+            dpg.add_input_int(
+                tag="pana_upper_value_filter",
+                default_value=0,
+                width=80,
+                callback=refresh_pana_table,
+                min_value=0,
+                min_clamped=True
+            )
+            with dpg.tooltip("pana_upper_value_filter"):
+                dpg.add_text("Filter upper section (above separator)")
+                dpg.add_text("Shows only numbers with values > filter")
+                dpg.add_text("Set to 0 to show all numbers")
+            
+            dpg.add_spacer(width=10)
+            
+            dpg.add_text("Lower Filter:")
+            dpg.add_input_int(
+                tag="pana_lower_value_filter", 
+                default_value=0,
+                width=80,
+                callback=refresh_pana_table,
+                min_value=0,
+                min_clamped=True
+            )
+            with dpg.tooltip("pana_lower_value_filter"):
+                dpg.add_text("Filter lower section (below separator)")
+                dpg.add_text("Shows only numbers with values > filter")
+                dpg.add_text("Set to 0 to show all numbers")
+            
+            dpg.add_spacer(width=20)
+            
             dpg.add_button(label="Load Data", callback=refresh_pana_table, width=100)
+            dpg.add_button(label="Clear Filters", callback=clear_pana_filters, width=100)
             dpg.add_button(label="Export", callback=export_pana_table, width=80)
         
         # Collapsible date picker popup
@@ -1379,6 +1412,15 @@ def create_working_main_gui():
         dpg.set_value("universal_bazar_filter", "All Bazars")
         refresh_universal_table()
     
+    def clear_pana_filters():
+        """Clear pana table value filters"""
+        if dpg.does_item_exist("pana_upper_value_filter"):
+            dpg.set_value("pana_upper_value_filter", 0)
+        if dpg.does_item_exist("pana_lower_value_filter"):
+            dpg.set_value("pana_lower_value_filter", 0)
+        refresh_pana_table()
+        dpg.set_value("status_text", "Pana table filters cleared")
+    
     def get_pana_layout():
         """Get the complete pana table layout as specified"""
         # Upper section (first 12 rows)
@@ -1453,46 +1495,92 @@ def create_working_main_gui():
                         pana_values[129] = 200
                         pana_values[130] = 150
                     
-                    # Add upper section rows
+                    # Get filter values
+                    upper_filter = dpg.get_value("pana_upper_value_filter") if dpg.does_item_exist("pana_upper_value_filter") else 0
+                    lower_filter = dpg.get_value("pana_lower_value_filter") if dpg.does_item_exist("pana_lower_value_filter") else 0
+                    
+                    # Add upper section rows with filter applied
                     for row_numbers in upper_section:
                         with dpg.table_row(parent="pana_grid_table"):
                             for number in row_numbers:
-                                # Number cell
-                                dpg.add_text(str(number))
-                                # Value cell
                                 value = pana_values.get(number, 0)
-                                if value > 0:
-                                    dpg.add_text(str(value), color=(39, 174, 96, 255))  # Green for non-zero
+                                
+                                # Number cell - always show
+                                dpg.add_text(str(number))
+                                
+                                # Value cell - apply upper section filter
+                                if upper_filter > 0 and value > 0 and value <= upper_filter:
+                                    # Hide value if it doesn't pass filter
+                                    dpg.add_text("", color=(108, 117, 125, 255))  # Empty value cell
                                 else:
-                                    dpg.add_text("0", color=(108, 117, 125, 255))  # Gray for zero
+                                    # Show value normally
+                                    if value > 0:
+                                        dpg.add_text(str(value), color=(39, 174, 96, 255))  # Green for non-zero
+                                    else:
+                                        dpg.add_text("0", color=(108, 117, 125, 255))  # Gray for zero
                     
                     # Add separator row (empty row)
                     with dpg.table_row(parent="pana_grid_table"):
                         for i in range(20):  # 20 columns total
                             dpg.add_text("", color=(200, 200, 200, 255))
                     
-                    # Add lower section rows
+                    # Add lower section rows with filter applied
                     for row_numbers in lower_section:
                         with dpg.table_row(parent="pana_grid_table"):
                             for number in row_numbers:
-                                # Number cell
-                                dpg.add_text(str(number))
-                                # Value cell
                                 value = pana_values.get(number, 0)
-                                if value > 0:
-                                    dpg.add_text(str(value), color=(39, 174, 96, 255))  # Green for non-zero
+                                
+                                # Number cell - always show
+                                dpg.add_text(str(number))
+                                
+                                # Value cell - apply lower section filter
+                                if lower_filter > 0 and value > 0 and value <= lower_filter:
+                                    # Hide value if it doesn't pass filter
+                                    dpg.add_text("", color=(108, 117, 125, 255))  # Empty value cell
                                 else:
-                                    dpg.add_text("0", color=(108, 117, 125, 255))  # Gray for zero
+                                    # Show value normally
+                                    if value > 0:
+                                        dpg.add_text(str(value), color=(39, 174, 96, 255))  # Green for non-zero
+                                    else:
+                                        dpg.add_text("0", color=(108, 117, 125, 255))  # Gray for zero
                     
-                    # Add summary information
+                    # Add summary information with filter status
                     total_numbers = len(upper_section) * 10 + len(lower_section) * 10  # 220 total
                     non_zero_count = len([v for v in pana_values.values() if v > 0])
                     total_value = sum(pana_values.values())
                     
+                    # Count visible values for each section (numbers always visible)
+                    upper_visible_values = 0
+                    lower_visible_values = 0
+                    upper_total_values = 0
+                    lower_total_values = 0
+                    
+                    # Count upper section values
+                    for row_numbers in upper_section:
+                        for number in row_numbers:
+                            value = pana_values.get(number, 0)
+                            if value > 0:
+                                upper_total_values += 1
+                                if upper_filter == 0 or value > upper_filter:
+                                    upper_visible_values += 1
+                    
+                    # Count lower section values
+                    for row_numbers in lower_section:
+                        for number in row_numbers:
+                            value = pana_values.get(number, 0)
+                            if value > 0:
+                                lower_total_values += 1
+                                if lower_filter == 0 or value > lower_filter:
+                                    lower_visible_values += 1
+                    
+                    filter_status = ""
+                    if upper_filter > 0 or lower_filter > 0:
+                        filter_status = f" | Visible values: Upper {upper_visible_values}/{upper_total_values}, Lower {lower_visible_values}/{lower_total_values}"
+                    
                     dpg.set_value("status_text", 
                         f"Pana table loaded for {bazar_value} | "
                         f"Numbers: {non_zero_count}/{total_numbers} active | "
-                        f"Total value: ₹{total_value:,}")
+                        f"Total value: ₹{total_value:,}{filter_status}")
                 else:
                     dpg.set_value("status_text", "Please select date and bazar to load Pana table")
         except Exception as e:
