@@ -840,7 +840,7 @@ def create_working_main_gui():
             
             dpg.add_spacer(width=20)
             
-            dpg.add_text("Upper Filter:")
+            dpg.add_text("SP Filter:")
             dpg.add_input_int(
                 tag="pana_upper_value_filter",
                 default_value=0,
@@ -856,7 +856,7 @@ def create_working_main_gui():
             
             dpg.add_spacer(width=10)
             
-            dpg.add_text("Lower Filter:")
+            dpg.add_text("DP Filter:")
             dpg.add_input_int(
                 tag="pana_lower_value_filter", 
                 default_value=0,
