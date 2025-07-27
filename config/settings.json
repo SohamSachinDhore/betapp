@@ -1,0 +1,29 @@
+{
+  "database": {
+    "path": "./data/rickymama.db",
+    "backup_interval": 86400,
+    "max_connections": 5
+  },
+  "gui": {
+    "window_width": 1200,
+    "window_height": 800,
+    "theme": "default",
+    "auto_save_interval": 300
+  },
+  "export": {
+    "default_path": "./exports/",
+    "auto_backup": true,
+    "max_export_rows": 100000
+  },
+  "validation": {
+    "strict_pana_validation": true,
+    "max_input_lines": 1000,
+    "timeout_seconds": 30
+  },
+  "logging": {
+    "level": "INFO",
+    "file_path": "./logs/rickymama.log",
+    "max_file_size": "10MB",
+    "backup_count": 5
+  }
+}
