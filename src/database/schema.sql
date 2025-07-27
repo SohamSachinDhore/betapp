@@ -105,7 +105,7 @@ CREATE TABLE universal_log (
     CONSTRAINT universal_log_number_range CHECK (number >= 0 AND number <= 999),
     CONSTRAINT universal_log_value_positive CHECK (value >= 0),
     CONSTRAINT universal_log_entry_type_valid CHECK (
-        entry_type IN ('PANA', 'TYPE', 'TIME_DIRECT', 'TIME_MULTI', 'DIRECT')
+        entry_type IN ('PANA', 'TYPE', 'TIME_DIRECT', 'TIME_MULTI', 'DIRECT', 'JODI')
     )
 );
 
@@ -199,6 +199,36 @@ AFTER UPDATE ON time_table
 FOR EACH ROW
 BEGIN
     UPDATE time_table SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+-- Create jodi table for jodi number storage
+CREATE TABLE jodi_table (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bazar TEXT NOT NULL,
+    entry_date DATE NOT NULL,
+    jodi_number INTEGER NOT NULL,
+    value INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraints
+    CONSTRAINT jodi_table_jodi_number_range CHECK (jodi_number >= 0 AND jodi_number <= 99),
+    CONSTRAINT jodi_table_value_positive CHECK (value >= 0),
+    
+    -- Unique constraint for bazar + date + jodi_number
+    UNIQUE(bazar, entry_date, jodi_number)
+);
+
+-- Create indexes for jodi_table
+CREATE INDEX idx_jodi_table_bazar_date ON jodi_table(bazar, entry_date);
+CREATE INDEX idx_jodi_table_jodi_number ON jodi_table(jodi_number);
+CREATE INDEX idx_jodi_table_value ON jodi_table(value) WHERE value > 0;
+
+-- Create trigger for jodi_table updated_at
+CREATE TRIGGER jodi_table_updated_at 
+AFTER UPDATE ON jodi_table
+FOR EACH ROW
+BEGIN
+    UPDATE jodi_table SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
 -- Create customer summary by bazar table
@@ -491,6 +521,19 @@ BEGIN
         col_7 = col_7 + (CASE WHEN NEW.number = 7 THEN NEW.value ELSE 0 END),
         col_8 = col_8 + (CASE WHEN NEW.number = 8 THEN NEW.value ELSE 0 END),
         col_9 = col_9 + (CASE WHEN NEW.number = 9 THEN NEW.value ELSE 0 END),
+        updated_at = CURRENT_TIMESTAMP;
+END;
+
+-- Trigger to update jodi_table from universal_log (JODI entries)
+CREATE TRIGGER tr_update_jodi_table
+AFTER INSERT ON universal_log
+FOR EACH ROW
+WHEN NEW.entry_type = 'JODI'
+BEGIN
+    INSERT INTO jodi_table (bazar, entry_date, jodi_number, value)
+    VALUES (NEW.bazar, NEW.entry_date, NEW.number, NEW.value)
+    ON CONFLICT(bazar, entry_date, jodi_number) DO UPDATE SET 
+        value = value + excluded.value,
         updated_at = CURRENT_TIMESTAMP;
 END;
 

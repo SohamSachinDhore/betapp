@@ -11,6 +11,7 @@ class PatternType(Enum):
     TYPE_TABLE = "type_table"
     TIME_DIRECT = "time_direct"
     TIME_MULTIPLY = "time_multiply"
+    JODI_TABLE = "jodi_table"
     DIRECT_NUMBER = "direct_number"
     MIXED = "mixed"
     UNKNOWN = "unknown"
@@ -22,6 +23,7 @@ class PatternDetector:
     PATTERNS = {
         PatternType.TYPE_TABLE: r'(\d+)(SP|DP|CP)\s*=\s*\d+',
         PatternType.TIME_MULTIPLY: r'(\d{2})x(\d+)',
+        PatternType.JODI_TABLE: r'(\d{2}-\d{2}-.*=\d+)|(\d{2}-\d{2}-\d{2})',  # Jodi numbers with hyphens, ending in =value or just hyphen pattern
         PatternType.DIRECT_NUMBER: r'^\s*(\d{1,2})\s*=\s*\d+\s*$',  # 1-2 digit direct numbers only
         PatternType.PANA_TABLE: r'(\d{3}[\/\+\s\,\*]+.*=.*\d+)|(\d{3}\s*=\s*\d+)|(.*,\s*=.*Rs)|(^\d{3},\d{3},)|(^\s*=.*Rs)|(.*,\s*$)|(\d{3}[\/\+\,\*]+(\d{3}[\/\+\,\*]+)*\d{3}[\/\+\,\*]*$)|(^\s*=\s*\d+\s*$)',
         PatternType.TIME_DIRECT: r'^([\d\s]+)\s*={1,2}\s*\d+$',
@@ -52,8 +54,8 @@ class PatternDetector:
         if not line:
             return PatternType.UNKNOWN
         
-        # First check TYPE_TABLE and TIME_MULTIPLY (highest priority)
-        for pattern_type in [PatternType.TYPE_TABLE, PatternType.TIME_MULTIPLY]:
+        # First check TYPE_TABLE, TIME_MULTIPLY, and JODI_TABLE (highest priority)
+        for pattern_type in [PatternType.TYPE_TABLE, PatternType.TIME_MULTIPLY, PatternType.JODI_TABLE]:
             regex = self.PATTERNS[pattern_type]
             if re.search(regex, line, re.IGNORECASE):
                 self.logger.debug(f"Detected pattern {pattern_type.value} for line: {line}")

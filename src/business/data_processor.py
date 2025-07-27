@@ -62,6 +62,7 @@ class MixedProcessingResult:
     time_count: int = 0
     multi_count: int = 0
     direct_count: int = 0
+    jodi_count: int = 0
     total_value: int = 0
     entries_saved: int = 0
     customer_id: int = 0
@@ -337,6 +338,10 @@ class DataProcessor:
                     # TIME_DIRECT entries (special format like "6 8 9 0==3300") are handled by trigger tr_update_time_table_direct
                     # No manual processing needed to avoid double processing
                     pass
+                elif entry.entry_type == EntryType.JODI:
+                    # JODI entries are handled by trigger tr_update_jodi_table
+                    # No manual processing needed to avoid double processing
+                    pass
             
             # PANA entries are automatically handled by the database trigger tr_update_pana_table
             # No manual updates needed - the trigger handles universal_log → pana_table
@@ -592,6 +597,7 @@ class DataProcessor:
             time_count = len(parsed_result.time_entries)
             multi_count = len(parsed_result.multi_entries)
             direct_count = len(parsed_result.direct_entries)
+            jodi_count = len(getattr(parsed_result, 'jodi_entries', []) or [])
             
             # Use calculation totals for total value
             total_value = result.calculation.grand_total
@@ -603,6 +609,7 @@ class DataProcessor:
                 time_count=time_count,
                 multi_count=multi_count,
                 direct_count=direct_count,
+                jodi_count=jodi_count,
                 total_value=total_value,
                 entries_saved=result.entries_saved,
                 customer_id=result.customer_id,

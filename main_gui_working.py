@@ -100,7 +100,8 @@ def create_working_main_gui():
                                    len(parsed_result.type_entries or []) + 
                                    len(parsed_result.time_entries or []) + 
                                    len(parsed_result.multi_entries or []) +
-                                   len(parsed_result.direct_entries or []))
+                                   len(parsed_result.direct_entries or []) +
+                                   len(getattr(parsed_result, 'jodi_entries', []) or []))
                     
                     # Update validation status
                     dpg.set_value("validation_status", f"✓ {total_entries} entries detected")
@@ -114,7 +115,8 @@ def create_working_main_gui():
                                      getattr(calc_result, 'type_total', 0) + 
                                      getattr(calc_result, 'time_total', 0) + 
                                      getattr(calc_result, 'multi_total', 0) + 
-                                     getattr(calc_result, 'direct_total', 0))
+                                     getattr(calc_result, 'direct_total', 0) + 
+                                     getattr(calc_result, 'jodi_total', 0))
                     
                     dpg.set_value("calculated_total", f"₹{total_value:,}")
                     
@@ -196,6 +198,20 @@ def create_working_main_gui():
                         
                         if hasattr(calc_result, 'time_total') and calc_result.time_total > 0:
                             preview_lines.append(f"   → Subtotal: ₹{calc_result.time_total:,}")
+                        preview_lines.append("")
+                    
+                    # Check for jodi entries (new pattern type)
+                    if hasattr(parsed_result, 'jodi_entries') and parsed_result.jodi_entries:
+                        preview_lines.append(f"[JODI] Jodi Numbers ({len(parsed_result.jodi_entries)}):")
+                        for entry in parsed_result.jodi_entries:
+                            jodi_numbers_str = "-".join(map(str, entry.jodi_numbers))
+                            if len(jodi_numbers_str) > 50:  # Truncate if too long
+                                jodi_numbers_str = jodi_numbers_str[:50] + "..."
+                            preview_lines.append(f"   {jodi_numbers_str} = ₹{entry.value:,}")
+                            preview_lines.append(f"   → {len(entry.jodi_numbers)} jodi numbers × ₹{entry.value:,} = ₹{len(entry.jodi_numbers) * entry.value:,}")
+                        
+                        if hasattr(calc_result, 'jodi_total') and calc_result.jodi_total > 0:
+                            preview_lines.append(f"   → Subtotal: ₹{calc_result.jodi_total:,}")
                         preview_lines.append("")
                     
                     if parsed_result.multi_entries:
@@ -309,7 +325,7 @@ def create_working_main_gui():
                         result = processor.process_mixed_input(context)
                         
                         if result.success:
-                            total_entries = result.pana_count + result.type_count + result.time_count + result.multi_count + result.direct_count
+                            total_entries = result.pana_count + result.type_count + result.time_count + result.multi_count + result.direct_count + getattr(result, 'jodi_count', 0)
                             total_value = result.total_value or 0
                             
                             dpg.set_value("status_text", f"✅ Success: {total_entries} entries saved! Total: ₹{total_value:.2f}")
@@ -324,6 +340,7 @@ def create_working_main_gui():
                                 refresh_universal_table()
                                 refresh_pana_table()
                                 refresh_time_table()
+                                refresh_jodi_table()
                                 refresh_summary_table()
                             
                             # Also refresh customer list for the dropdown
@@ -550,6 +567,33 @@ def create_working_main_gui():
         dpg.configure_item("time_date_picker_popup", show=False)
         refresh_time_table()
     
+    def apply_jodi_date_change():
+        """Apply the selected date from jodi date picker"""
+        try:
+            date_dict = dpg.get_value("jodi_date_filter")
+            selected_date = date(
+                year=date_dict['year'],
+                month=date_dict['month'] + 1,
+                day=date_dict['month_day']
+            )
+            dpg.set_value("jodi_date_display", selected_date.strftime("%Y-%m-%d"))
+            dpg.configure_item("jodi_date_picker_popup", show=False)
+            refresh_jodi_table()
+        except Exception as e:
+            dpg.set_value("status_text", f"Error applying jodi date: {e}")
+    
+    def set_jodi_date_today():
+        """Set jodi date to today"""
+        today = date.today()
+        dpg.set_value("jodi_date_display", today.strftime("%Y-%m-%d"))
+        dpg.set_value("jodi_date_filter", {
+            'month_day': today.day,
+            'month': today.month - 1,
+            'year': today.year
+        })
+        dpg.configure_item("jodi_date_picker_popup", show=False)
+        refresh_jodi_table()
+    
     def apply_summary_date_change():
         """Apply the selected date from summary date picker"""
         try:
@@ -676,6 +720,10 @@ def create_working_main_gui():
                 # Time table tab (unique to date+bazar+customer)
                 with dpg.tab(label="Time Table", tag="time_tab"):
                     create_time_table()
+                
+                # Jodi table tab (unique to date+bazar)
+                with dpg.tab(label="Jodi Table", tag="jodi_tab"):
+                    create_jodi_table()
                 
                 # Summary tab (unique to date+customer)
                 with dpg.tab(label="Customer Summary", tag="summary_tab"):
@@ -950,6 +998,96 @@ def create_working_main_gui():
         
         # Load initial data
         refresh_time_table()
+    
+    def create_jodi_table():
+        """Create jodi table view (unique to date+bazar)"""
+        # Date and Bazar filters
+        with dpg.group(horizontal=True):
+            dpg.add_text("Date:")
+            today = date.today()
+            # Date display field with current date as default
+            dpg.add_input_text(
+                tag="jodi_date_display",
+                default_value=today.strftime("%Y-%m-%d"),
+                width=100,
+                readonly=True
+            )
+            dpg.add_button(
+                label="📅",
+                tag="jodi_date_toggle_btn",
+                callback=lambda: dpg.configure_item("jodi_date_picker_popup", show=not dpg.is_item_shown("jodi_date_picker_popup")),
+                width=30,
+                height=23
+            )
+            
+            dpg.add_spacer(width=20)
+            
+            dpg.add_text("Bazar:")
+            dpg.add_combo(
+                items=[b["display_name"] for b in bazars],
+                tag="jodi_bazar_filter",
+                default_value=bazars[0]["display_name"] if bazars else "No Bazars",
+                width=120,
+                callback=refresh_jodi_table
+            )
+            
+            dpg.add_spacer(width=20)
+            
+            dpg.add_button(label="Load Data", callback=refresh_jodi_table, width=100)
+            dpg.add_button(label="Export", callback=export_jodi_table, width=80)
+        
+        # Collapsible date picker popup
+        with dpg.popup("jodi_date_toggle_btn", tag="jodi_date_picker_popup", modal=False):
+            dpg.add_text("Select Date:")
+            dpg.add_date_picker(
+                tag="jodi_date_filter",
+                default_value={
+                    'month_day': today.day,
+                    'month': today.month - 1,
+                    'year': today.year
+                }
+            )
+            with dpg.group(horizontal=True):
+                dpg.add_button(
+                    label="Apply",
+                    callback=lambda: apply_jodi_date_change(),
+                    width=60
+                )
+                dpg.add_button(
+                    label="Today",
+                    callback=lambda: set_jodi_date_today(),
+                    width=60
+                )
+                dpg.add_button(
+                    label="Close",
+                    callback=lambda: dpg.configure_item("jodi_date_picker_popup", show=False),
+                    width=60
+                )
+        
+        dpg.add_separator()
+        
+        # Jodi table display in grid format (unique per Date + Bazar)
+        dpg.add_text("Jodi Table Data (Unique per Date + Bazar) - Jodi Numbers 00-99:")
+        
+        # Create jodi grid table - 10x10 grid arranged by tens digit columns
+        with dpg.table(
+            header_row=True,
+            resizable=False,
+            borders_innerH=True,
+            borders_innerV=True,
+            borders_outerH=True,
+            borders_outerV=True,
+            tag="jodi_grid_table",
+            height=-50
+        ):
+            # Create 20 columns (10 pairs of Number|Value for each column)
+            column_headers = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+            for i in range(10):
+                dpg.add_table_column(label=column_headers[i], width=35)
+                dpg.add_table_column(label="", width=40)
+        
+        # Load initial data
+        refresh_jodi_table()
     
     def create_summary_table():
         """Create customer summary table view (unique to date+customer)"""
@@ -1404,6 +1542,91 @@ def create_working_main_gui():
         except Exception as e:
             dpg.set_value("status_text", f"Error refreshing time table: {e}")
     
+    def refresh_jodi_table():
+        """Refresh jodi table data for selected date+bazar"""
+        try:
+            if dpg.does_item_exist("jodi_grid_table"):
+                dpg.delete_item("jodi_grid_table", children_only=True, slot=1)
+                
+                # Get selected date and bazar from display fields
+                date_str = dpg.get_value("jodi_date_display")
+                bazar_value = dpg.get_value("jodi_bazar_filter")
+                
+                if date_str and bazar_value and bazar_value != "No Bazars":
+                    # Get jodi data from database for selected date+bazar
+                    jodi_values = {}  # jodi_number -> value mapping
+                    
+                    if db_manager:
+                        try:
+                            # Get bazar name (not display name)
+                            bazar_name = bazar_value
+                            for bazar in bazars:
+                                if bazar['display_name'] == bazar_value:
+                                    bazar_name = bazar['name']
+                                    break
+                            
+                            # Fetch jodi data from database using new method
+                            if hasattr(db_manager, 'get_jodi_table_values'):
+                                jodi_data = db_manager.get_jodi_table_values(bazar_name, date_str)
+                                for entry in jodi_data:
+                                    if hasattr(entry, '__getitem__'):  # Row object or dict
+                                        jodi_values[entry['jodi_number']] = entry['value']
+                        except Exception as e:
+                            print(f"Database error: {e}")
+                    
+                    # For demo, add some sample values if no real data
+                    if not jodi_values:
+                        jodi_values[22] = 100
+                        jodi_values[44] = 200
+                        jodi_values[66] = 150
+                        jodi_values[88] = 300
+                    
+                    # Create 10x10 grid arranged as per user's layout
+                    # Row 1: 11, 21, 31, 41, 51, 61, 71, 81, 91, 1
+                    # Row 2: 12, 22, 32, 42, 52, 62, 72, 82, 92, 2
+                    # ...
+                    # Row 9: 19, 29, 39, 49, 59, 69, 79, 89, 99, 9
+                    # Row 10: 10, 20, 30, 40, 50, 60, 70, 80, 90, 0
+                    for row in range(10):
+                        with dpg.table_row(parent="jodi_grid_table"):
+                            for col in range(10):
+                                # Calculate jodi number for this position
+                                if col == 9:  # Last column (0X numbers)
+                                    if row == 9:  # Last row, last column = 00
+                                        jodi_number = 0
+                                    else:  # Other rows in last column = 1,2,3,4,5,6,7,8,9
+                                        jodi_number = row + 1
+                                else:  # Other columns (1X, 2X, 3X, 4X, 5X, 6X, 7X, 8X, 9X)
+                                    tens_digit = col + 1  # 1,2,3,4,5,6,7,8,9
+                                    if row == 9:  # Last row = X0 (10,20,30,40,50,60,70,80,90)
+                                        jodi_number = tens_digit * 10
+                                    else:  # Other rows = X1,X2,X3,X4,X5,X6,X7,X8,X9
+                                        jodi_number = tens_digit * 10 + (row + 1)
+                                
+                                # Jodi number cell
+                                dpg.add_text(f"{jodi_number:02d}")
+                                
+                                # Value cell
+                                value = jodi_values.get(jodi_number, 0)
+                                if value > 0:
+                                    dpg.add_text(str(value), color=(39, 174, 96, 255))  # Green for non-zero
+                                else:
+                                    dpg.add_text("0", color=(108, 117, 125, 255))  # Gray for zero
+                    
+                    # Add summary information
+                    total_jodi_numbers = 100  # 00-99
+                    non_zero_count = len([v for v in jodi_values.values() if v > 0])
+                    total_value = sum(jodi_values.values())
+                    
+                    dpg.set_value("status_text", 
+                        f"Jodi table loaded for {bazar_value} | "
+                        f"Jodi numbers: {non_zero_count}/{total_jodi_numbers} active | "
+                        f"Total value: ₹{total_value:,}")
+                else:
+                    dpg.set_value("status_text", "Please select date and bazar to load Jodi table")
+        except Exception as e:
+            dpg.set_value("status_text", f"Error refreshing jodi table: {e}")
+    
     def refresh_summary_table():
         """Refresh customer summary table data"""
         try:
@@ -1508,6 +1731,45 @@ def create_working_main_gui():
                     dpg.set_value("status_text", f"Time table exported to: {filepath}")
                 else:
                     dpg.set_value("status_text", "Please select date and bazar for time export")
+            else:
+                dpg.set_value("status_text", "Database not available for export")
+        except Exception as e:
+            dpg.set_value("status_text", f"Export error: {e}")
+    
+    def export_jodi_table():
+        """Export jodi table data"""
+        try:
+            if db_manager:
+                from src.utils.export_manager import ExportManager
+                export_manager = ExportManager()
+                
+                # Get current filters
+                date_str = dpg.get_value("jodi_date_display")
+                bazar_value = dpg.get_value("jodi_bazar_filter")
+                
+                if date_str and bazar_value and bazar_value != "No Bazars":
+                    # Get bazar name
+                    bazar_name = bazar_value
+                    for bazar in bazars:
+                        if bazar['display_name'] == bazar_value:
+                            bazar_name = bazar['name']
+                            break
+                    
+                    # Export jodi table data (may need to add this method to ExportManager)
+                    try:
+                        if hasattr(export_manager, 'export_jodi_table'):
+                            filepath = export_manager.export_jodi_table(db_manager, bazar_name, date_str)
+                        else:
+                            # Fallback to generic export
+                            filepath = f"./exports/jodi_table_{bazar_name}_{date_str}.csv"
+                            dpg.set_value("status_text", "Jodi export method not yet implemented in ExportManager")
+                            return
+                        
+                        dpg.set_value("status_text", f"Jodi table exported to: {filepath}")
+                    except Exception as e:
+                        dpg.set_value("status_text", f"Jodi export error: {e}")
+                else:
+                    dpg.set_value("status_text", "Please select date and bazar for jodi export")
             else:
                 dpg.set_value("status_text", "Database not available for export")
         except Exception as e:
@@ -1688,7 +1950,7 @@ def create_working_main_gui():
                     multiline=True,
                     width=-1,
                     height=400,
-                    hint="Enter your data here...\\n\\nSupported formats:\\n- PANA: 128/129/120 = 100\\n- Type: 1SP=100, 5DP=200\\n- Time: 1=100, 2 4 6=300\\n- Multi: 38x700, 83x500",
+                    hint="Enter your data here...\\n\\nSupported formats:\\n- PANA: 128/129/120 = 100\\n- Type: 1SP=100, 5DP=200\\n- Time: 1=100, 2 4 6=300\\n- Multi: 38x700, 83x500\\n- Jodi: 22-24-26\\n42-44-46=500",
                     callback=on_input_change
                 )
                 

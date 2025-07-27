@@ -12,6 +12,7 @@ class EntryType(Enum):
     TIME_DIRECT = "TIME_DIRECT"
     TIME_MULTI = "TIME_MULTI"
     DIRECT = "DIRECT"
+    JODI = "JODI"
 
 class PatternType(Enum):
     """Input pattern type enumeration"""
@@ -19,6 +20,7 @@ class PatternType(Enum):
     TYPE_TABLE = "type_table"
     TIME_DIRECT = "time_direct"
     TIME_MULTIPLY = "time_multiply"
+    JODI_TABLE = "jodi_table"
     MIXED = "mixed"
     UNKNOWN = "unknown"
 
@@ -246,6 +248,21 @@ class DirectNumberEntry:
             raise ValueError(f"Invalid value: {self.value}")
 
 @dataclass
+class JodiEntry:
+    """Jodi number assignment entry"""
+    jodi_numbers: List[int]
+    value: int
+    
+    def __post_init__(self):
+        if not self.jodi_numbers:
+            raise ValueError("Jodi numbers list cannot be empty")
+        for jodi_number in self.jodi_numbers:
+            if not (0 <= jodi_number <= 99):
+                raise ValueError(f"Invalid jodi number: {jodi_number}")
+        if self.value <= 0:
+            raise ValueError(f"Invalid value: {self.value}")
+
+@dataclass
 class ParsedInputResult:
     """Result of parsing user input"""
     pana_entries: List[PanaEntry] = field(default_factory=list)
@@ -253,18 +270,19 @@ class ParsedInputResult:
     time_entries: List[TimeEntry] = field(default_factory=list)
     multi_entries: List[MultiEntry] = field(default_factory=list)
     direct_entries: List[DirectNumberEntry] = field(default_factory=list)
+    jodi_entries: List[JodiEntry] = field(default_factory=list)
     
     @property
     def is_empty(self) -> bool:
         """Check if no entries were parsed"""
         return not (self.pana_entries or self.type_entries or 
-                   self.time_entries or self.multi_entries or self.direct_entries)
+                   self.time_entries or self.multi_entries or self.direct_entries or self.jodi_entries)
     
     @property
     def total_entries(self) -> int:
         """Get total number of parsed entries"""
         return (len(self.pana_entries) + len(self.type_entries) + 
-                len(self.time_entries) + len(self.multi_entries) + len(self.direct_entries))
+                len(self.time_entries) + len(self.multi_entries) + len(self.direct_entries) + len(self.jodi_entries))
 
 @dataclass
 class CalculationResult:

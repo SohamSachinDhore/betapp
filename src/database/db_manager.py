@@ -320,6 +320,16 @@ class DatabaseManager:
         rows = self.execute_query(query)
         return {row['number'] for row in rows} if rows else set()
     
+    # Jodi Table Operations
+    def get_jodi_table_values(self, bazar: str, entry_date: str) -> List[sqlite3.Row]:
+        """Get all jodi values for a specific bazar and date"""
+        query = """
+        SELECT jodi_number, value FROM jodi_table
+        WHERE bazar = ? AND entry_date = ?
+        ORDER BY jodi_number
+        """
+        return self.execute_query(query, (bazar, entry_date))
+    
     # Time Table Operations
     def update_time_table_entry(self, customer_id: int, customer_name: str, 
                                bazar: str, entry_date: str, column_values: Dict[int, int]) -> None:

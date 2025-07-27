@@ -26,6 +26,8 @@ class CalculationResult:
     type_total: int = 0
     time_total: int = 0
     multi_total: int = 0
+    direct_total: int = 0
+    jodi_total: int = 0
     grand_total: int = 0
     calculation_details: Dict[str, Any] = field(default_factory=dict)
 
@@ -39,6 +41,7 @@ class BusinessCalculation:
     time_total: int = 0
     multi_total: int = 0
     direct_total: int = 0
+    jodi_total: int = 0
     breakdown: Dict[str, Any] = field(default_factory=dict)
     universal_entries: List[UniversalLogEntry] = field(default_factory=list)
 
@@ -74,7 +77,8 @@ class CalculationEngine:
         result.type_total = self.calculate_type_total(parsed_entries.type_entries or [])
         result.time_total = self.calculate_time_total(parsed_entries.time_entries or [])
         result.multi_total = self.calculate_multi_total(parsed_entries.multi_entries or [])
-        result.direct_total = self.calculate_direct_total(parsed_entries.direct_entries or [])
+        result.direct_total = self.calculate_direct_total(getattr(parsed_entries, 'direct_entries', []) or [])
+        result.jodi_total = self.calculate_jodi_total(getattr(parsed_entries, 'jodi_entries', []) or [])
         
         # Calculate grand total
         result.grand_total = (
@@ -82,7 +86,8 @@ class CalculationEngine:
             result.type_total + 
             result.time_total + 
             result.multi_total + 
-            result.direct_total
+            result.direct_total + 
+            result.jodi_total
         )
         
         return result
@@ -140,10 +145,19 @@ class CalculationEngine:
             else:
                 calculation.direct_total = 0
             
+            # Add support for jodi entries
+            if hasattr(result, 'jodi_entries') and result.jodi_entries:
+                jodi_calc = self._calculate_jodi_entries(context, result.jodi_entries)
+                calculation.jodi_total = jodi_calc['total']
+                calculation.breakdown['jodi'] = jodi_calc
+                calculation.universal_entries.extend(jodi_calc['universal_entries'])
+            else:
+                calculation.jodi_total = 0
+            
             # Calculate totals
             calculation.bazar_total = (calculation.pana_total + calculation.type_total + 
                                     calculation.time_total + calculation.multi_total + 
-                                    calculation.direct_total)
+                                    calculation.direct_total + calculation.jodi_total)
             calculation.grand_total = calculation.bazar_total
             
             # Add summary to breakdown
@@ -156,7 +170,8 @@ class CalculationEngine:
                     'type': calculation.type_total,
                     'time': calculation.time_total,
                     'multi': calculation.multi_total,
-                    'direct': calculation.direct_total
+                    'direct': calculation.direct_total,
+                    'jodi': calculation.jodi_total
                 }
             }
             
@@ -407,6 +422,49 @@ class CalculationEngine:
             'calculation_method': 'direct_assignment'
         }
     
+    def _calculate_jodi_entries(self, context: CalculationContext, entries) -> Dict[str, Any]:
+        """Calculate jodi entries - each jodi number gets the full value"""
+        total = 0
+        universal_entries = []
+        entry_details = []
+        
+        for entry in entries:
+            # Each jodi number gets the full value
+            # Total calculation: number_of_jodi_numbers × value
+            entry_total = len(entry.jodi_numbers) * entry.value
+            total += entry_total
+            
+            # Create universal entry for each jodi number
+            for jodi_number in entry.jodi_numbers:
+                universal_entry = UniversalLogEntry(
+                    customer_id=context.customer_id,
+                    customer_name=context.customer_name,
+                    entry_date=context.entry_date,
+                    bazar=context.bazar,
+                    number=jodi_number,  # Jodi number (00-99)
+                    value=entry.value,   # Full value for each jodi number
+                    entry_type=EntryType.JODI,
+                    source_line=f"{'-'.join(map(str, entry.jodi_numbers))}={entry.value}"
+                )
+                universal_entries.append(universal_entry)
+            
+            entry_details.append({
+                'jodi_numbers': entry.jodi_numbers,
+                'input_value': entry.value,
+                'count': len(entry.jodi_numbers),
+                'total_value': entry_total,
+                'value_per_jodi': entry.value,  # Full value per jodi number
+                'calculation': f"{entry.value} × {len(entry.jodi_numbers)} = {entry_total} (each jodi gets full {entry.value})"
+            })
+        
+        return {
+            'total': total,
+            'entry_count': len(entries),
+            'universal_entries': universal_entries,
+            'details': entry_details,
+            'calculation_method': 'jodi_assignment'
+        }
+    
     def calculate_pana_total(self, entries: List[PanaEntry]) -> int:
         """Calculate pana total following specification rules"""
         if not entries:
@@ -472,6 +530,16 @@ class CalculationEngine:
     def calculate_direct_total(self, entries: List) -> int:
         """Calculate direct number total (simple sum of values)"""
         return sum(entry.value for entry in entries)
+    
+    def calculate_jodi_total(self, entries: List) -> int:
+        """Calculate jodi total - each jodi number gets the full value"""
+        total = 0
+        for entry in entries:
+            # Each jodi number gets the full value
+            # Total calculation: number_of_jodi_numbers × value
+            entry_total = len(entry.jodi_numbers) * entry.value
+            total += entry_total
+        return total
     
     def validate_pana_number(self, number: int) -> bool:
         """Validate if number exists in pana table"""

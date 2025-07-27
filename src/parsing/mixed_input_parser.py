@@ -12,6 +12,7 @@ from .type_table_parser import TypeTableParser, TypeTableValidator
 from .time_table_parser import TimeTableParser, TimeTableValidator
 from .multiplication_parser import MultiplicationParser, MultiplicationValidator
 from .direct_number_parser import DirectNumberParser, DirectNumberValidator
+from .jodi_parser import JodiTableParser, JodiValidator
 
 class MixedInputParser:
     """Mixed input parser that handles multiple pattern types in single input"""
@@ -21,7 +22,8 @@ class MixedInputParser:
                  type_validator: Optional[TypeTableValidator] = None,
                  time_validator: Optional[TimeTableValidator] = None,
                  multi_validator: Optional[MultiplicationValidator] = None,
-                 direct_validator: Optional[DirectNumberValidator] = None):
+                 direct_validator: Optional[DirectNumberValidator] = None,
+                 jodi_validator: Optional[JodiValidator] = None):
         """
         Initialize with individual pattern validators
         
@@ -31,6 +33,7 @@ class MixedInputParser:
             time_validator: Validator for time table entries
             multi_validator: Validator for multiplication entries
             direct_validator: Validator for direct number entries
+            jodi_validator: Validator for jodi table entries
         """
         self.pattern_detector = PatternDetector()
         
@@ -40,6 +43,7 @@ class MixedInputParser:
         self.time_parser = TimeTableParser(time_validator)
         self.multi_parser = MultiplicationParser(multi_validator)
         self.direct_parser = DirectNumberParser(direct_validator)
+        self.jodi_parser = JodiTableParser(jodi_validator)
         
         self.logger = get_logger(__name__)
     
@@ -115,6 +119,10 @@ class MixedInputParser:
                     entries = self.direct_parser.parse(combined_input)
                     result.direct_entries.extend(entries)
                     
+                elif pattern_type == PatternType.JODI_TABLE:
+                    entries = self.jodi_parser.parse(combined_input)
+                    result.jodi_entries.extend(entries)
+                    
             except Exception as e:
                 self.logger.warning(f"Failed to parse {pattern_type.value} lines: {e}")
                 # Continue with other patterns instead of failing completely
@@ -146,6 +154,10 @@ class MixedInputParser:
             elif pattern_type == PatternType.DIRECT_NUMBER:
                 entries = self.direct_parser.parse(input_text)
                 result.direct_entries = entries
+                
+            elif pattern_type == PatternType.JODI_TABLE:
+                entries = self.jodi_parser.parse(input_text)
+                result.jodi_entries = entries
                 
         except Exception as e:
             raise ParseError(f"Failed to parse {pattern_type.value} input: {e}")
