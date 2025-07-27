@@ -323,8 +323,8 @@ class DataProcessor:
                     direct_entries.append(entry)
                 elif entry.entry_type == EntryType.TYPE:
                     type_entries.append(entry)
-                elif entry.entry_type in [EntryType.TIME_DIRECT, EntryType.TIME_MULTI]:
-                    # Time entries (both direct and multiplication)
+                elif entry.entry_type == EntryType.TIME_MULTI:
+                    # TIME_MULTI entries (multiplication format like 38x700) - process manually
                     time_key = (entry.customer_id, entry.customer_name, entry.bazar, entry.entry_date)
                     if time_key not in time_entries_by_customer:
                         time_entries_by_customer[time_key] = {}
@@ -333,6 +333,10 @@ class DataProcessor:
                     if entry.number not in time_entries_by_customer[time_key]:
                         time_entries_by_customer[time_key][entry.number] = 0
                     time_entries_by_customer[time_key][entry.number] += entry.value
+                elif entry.entry_type == EntryType.TIME_DIRECT:
+                    # TIME_DIRECT entries (special format like "6 8 9 0==3300") are handled by trigger tr_update_time_table_direct
+                    # No manual processing needed to avoid double processing
+                    pass
             
             # PANA entries are automatically handled by the database trigger tr_update_pana_table
             # No manual updates needed - the trigger handles universal_log → pana_table

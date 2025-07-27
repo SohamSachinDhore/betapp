@@ -276,18 +276,13 @@ class CalculationEngine:
             entry_total = entry.value * len(entry.columns)
             total += entry_total  # Add to running total
             
-            # Distribute value equally across all specified columns for storage
-            value_per_column = entry.value // len(entry.columns)
-            remainder = entry.value % len(entry.columns)
-            
+            # Each column gets the FULL value (not split across columns)
+            # For 6 8 9 0==3300, each column (6,8,9,0) gets full 3300
             column_distributions = {}
             
-            for i, column in enumerate(entry.columns):
-                # Calculate value for this column (with remainder distribution)
-                column_value = value_per_column
-                if i < remainder:
-                    column_value += 1
-                
+            for column in entry.columns:
+                # Each column gets the full value
+                column_value = entry.value
                 column_distributions[column] = column_value
                 
                 # Create universal entry for this column
@@ -308,10 +303,9 @@ class CalculationEngine:
                 'input_value': entry.value,
                 'multiplier': len(entry.columns),
                 'total_value': entry_total,  # value × number_of_columns
-                'value_per_column': value_per_column,
-                'remainder_distributed': remainder,
+                'value_per_column': entry.value,  # Full value per column
                 'column_distributions': column_distributions,
-                'calculation': f"{entry.value} × {len(entry.columns)} = {entry_total}"
+                'calculation': f"{entry.value} × {len(entry.columns)} = {entry_total} (each column gets full {entry.value})"
             })
         
         return {
