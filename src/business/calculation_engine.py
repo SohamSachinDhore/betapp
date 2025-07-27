@@ -333,7 +333,7 @@ class CalculationEngine:
     
     def _calculate_multi_entries(self, context: CalculationContext, 
                                 entries: List[MultiEntry]) -> Dict[str, Any]:
-        """Calculate multiplication entries by applying values to digit positions"""
+        """Calculate multiplication entries by applying values to digit positions and jodi table"""
         total = 0
         universal_entries = []
         entry_details = []
@@ -368,13 +368,26 @@ class CalculationEngine:
             )
             universal_entries.append(units_universal)
             
+            # Create universal entry for JODI table using the full 2-digit number
+            jodi_universal = UniversalLogEntry(
+                customer_id=context.customer_id,
+                customer_name=context.customer_name,
+                entry_date=context.entry_date,
+                bazar=context.bazar,
+                number=entry.number,  # Full 2-digit number (38, 83, 96, etc.)
+                value=entry.value,
+                entry_type=EntryType.JODI,
+                source_line=f"{entry.number:02d}x{entry.value}"
+            )
+            universal_entries.append(jodi_universal)
+            
             entry_details.append({
                 'number': entry.number,
                 'tens_digit': entry.tens_digit,
                 'units_digit': entry.units_digit,
                 'value_per_digit': entry.value,
                 'total_value': entry.value,  # Fixed: single value per specification
-                'application': 'both_digits'
+                'application': 'both_digits_and_jodi'
             })
         
         return {
