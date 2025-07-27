@@ -11,7 +11,7 @@ class PanaTableParser:
     
     def __init__(self, pana_validator: Optional['PanaValidator'] = None):
         self.validator = pana_validator
-        self.separators = ['/', '+', ' ', ',', '*', '★', '✱']
+        self.separators = ['/', '+', ' ', ',', '*', '★', '✱','-']
         self.logger = get_logger(__name__)
         
         # Improved patterns for complex PANA formats
