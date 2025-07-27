@@ -1215,6 +1215,7 @@ def create_working_main_gui():
             dpg.add_table_column(label="M.O", width=80)
             dpg.add_table_column(label="M.K", width=80)
             dpg.add_table_column(label="K.O", width=80)
+            dpg.add_table_column(label="K.K", width=80)
             dpg.add_table_column(label="NMO", width=80)
             dpg.add_table_column(label="NMK", width=80)
             dpg.add_table_column(label="B.O", width=80)
@@ -1621,7 +1622,7 @@ def create_working_main_gui():
                                             for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]:
                                                 value = entry[f'col_{i}'] if entry[f'col_{i}'] > 0 else "-"
                                                 dpg.add_text(str(value))
-                                            dpg.add_text(f"₹{entry['total']:,}")
+                                            dpg.add_text(f"{entry['total']:,}")
                                             dpg.add_text(entry['updated_at'] or entry['created_at'])
                             else:
                                 # Show empty row if no data
@@ -1646,12 +1647,12 @@ def create_working_main_gui():
                         for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]:
                             total = jodi_column_totals.get(i, 0)
                             if total > 0:
-                                dpg.add_text(f"₹{total:,}", color=(255, 193, 7, 255))
+                                dpg.add_text(f"{total:,}", color=(255, 193, 7, 255))
                             else:
                                 dpg.add_text("-", color=(108, 117, 125, 255))
                         # Grand total of all jodi columns
                         grand_total = sum(jodi_column_totals.values())
-                        dpg.add_text(f"₹{grand_total:,}", color=(255, 193, 7, 255))
+                        dpg.add_text(f"{grand_total:,}", color=(255, 193, 7, 255))
                         dpg.add_text("Live", color=(255, 193, 7, 255))
                         
                 dpg.set_value("status_text", f"Time table loaded for {date_str} (includes Jodi totals)")
@@ -1846,30 +1847,30 @@ def create_working_main_gui():
                                     with dpg.table_row(parent="summary_table"):
                                         dpg.add_text(entry['customer_name'])
                                         # Bazar totals in order: T.O, T.K, M.O, M.K, K.O, K.K, NMO, NMK, B.O, B.K
-                                        dpg.add_text(f"₹{entry['to_total']:,}")
-                                        dpg.add_text(f"₹{entry['tk_total']:,}")
-                                        dpg.add_text(f"₹{entry['mo_total']:,}")
-                                        dpg.add_text(f"₹{entry['mk_total']:,}")
-                                        dpg.add_text(f"₹{entry['ko_total']:,}")
-                                        dpg.add_text(f"₹{entry['kk_total']:,}")
-                                        dpg.add_text(f"₹{entry['nmo_total']:,}")
-                                        dpg.add_text(f"₹{entry['nmk_total']:,}")
-                                        dpg.add_text(f"₹{entry['bo_total']:,}")
-                                        dpg.add_text(f"₹{entry['bk_total']:,}")
-                                        dpg.add_text(f"₹{entry['grand_total']:,}")  # Grand total
+                                        dpg.add_text(f"{entry['to_total']:,}")
+                                        dpg.add_text(f"{entry['tk_total']:,}")
+                                        dpg.add_text(f"{entry['mo_total']:,}")
+                                        dpg.add_text(f"{entry['mk_total']:,}")
+                                        dpg.add_text(f"{entry['ko_total']:,}")
+                                        dpg.add_text(f"{entry['kk_total']:,}")
+                                        dpg.add_text(f"{entry['nmo_total']:,}")
+                                        dpg.add_text(f"{entry['nmk_total']:,}")
+                                        dpg.add_text(f"{entry['bo_total']:,}")
+                                        dpg.add_text(f"{entry['bk_total']:,}")
+                                        dpg.add_text(f"{entry['grand_total']:,}")  # Grand total
                                         dpg.add_text(entry['updated_at'] or entry['created_at'])
                         else:
                             # Show empty row if no data
                             with dpg.table_row(parent="summary_table"):
                                 dpg.add_text("No data for this date")
-                                for i in range(12):  # 10 bazars + Total + Date
-                                    dpg.add_text("₹0")
+                                for i in range(12):  # 11 bazars + Total + Date (now includes K.K)
+                                    dpg.add_text("0")
                     except Exception as e:
                         print(f"Database error loading summary: {e}")
                         # Show error row
                         with dpg.table_row(parent="summary_table"):
                             dpg.add_text("Error loading data")
-                            for i in range(12):
+                            for i in range(12):  # 11 bazars + Total + Date (now includes K.K)
                                 dpg.add_text("-")
                         
                 dpg.set_value("status_text", f"Summary table loaded for {date_str}")

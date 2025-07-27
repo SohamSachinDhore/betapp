@@ -19,7 +19,7 @@ def test_gui_fix():
     sys.path.append('.')
     
     try:
-        from main_gui_working import validate_input
+        from main import validate_input
         
         db_manager = DatabaseManager("data/rickymama.db")
         
