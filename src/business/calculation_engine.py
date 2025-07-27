@@ -436,7 +436,7 @@ class CalculationEngine:
         }
     
     def _calculate_jodi_entries(self, context: CalculationContext, entries) -> Dict[str, Any]:
-        """Calculate jodi entries - each jodi number gets the full value"""
+        """Calculate jodi entries - each jodi number gets the full value and populate time table based on digit frequencies"""
         total = 0
         universal_entries = []
         entry_details = []
@@ -447,9 +447,9 @@ class CalculationEngine:
             entry_total = len(entry.jodi_numbers) * entry.value
             total += entry_total
             
-            # Create universal entry for each jodi number
+            # Create universal entry for each jodi number (for jodi table)
             for jodi_number in entry.jodi_numbers:
-                universal_entry = UniversalLogEntry(
+                jodi_universal_entry = UniversalLogEntry(
                     customer_id=context.customer_id,
                     customer_name=context.customer_name,
                     entry_date=context.entry_date,
@@ -459,7 +459,31 @@ class CalculationEngine:
                     entry_type=EntryType.JODI,
                     source_line=f"{'-'.join(map(str, entry.jodi_numbers))}={entry.value}"
                 )
-                universal_entries.append(universal_entry)
+                universal_entries.append(jodi_universal_entry)
+            
+            # Calculate digit frequency for time table population
+            digit_frequency = {}
+            for jodi_number in entry.jodi_numbers:
+                # Extract units digit (column number for time table)
+                units_digit = jodi_number % 10
+                if units_digit not in digit_frequency:
+                    digit_frequency[units_digit] = 0
+                digit_frequency[units_digit] += 1
+            
+            # Create TIME_MULTI universal entries based on digit frequency
+            for digit, frequency in digit_frequency.items():
+                time_value = entry.value * frequency  # value × frequency
+                time_universal_entry = UniversalLogEntry(
+                    customer_id=context.customer_id,
+                    customer_name=context.customer_name,
+                    entry_date=context.entry_date,
+                    bazar=context.bazar,
+                    number=digit,  # Column number (0-9)
+                    value=time_value,  # value × frequency
+                    entry_type=EntryType.TIME_MULTI,
+                    source_line=f"{'-'.join(map(str, entry.jodi_numbers))}={entry.value} (digit_{digit}×{frequency})"
+                )
+                universal_entries.append(time_universal_entry)
             
             entry_details.append({
                 'jodi_numbers': entry.jodi_numbers,
@@ -467,6 +491,7 @@ class CalculationEngine:
                 'count': len(entry.jodi_numbers),
                 'total_value': entry_total,
                 'value_per_jodi': entry.value,  # Full value per jodi number
+                'digit_frequency': digit_frequency,  # Added digit frequency info
                 'calculation': f"{entry.value} × {len(entry.jodi_numbers)} = {entry_total} (each jodi gets full {entry.value})"
             })
         
