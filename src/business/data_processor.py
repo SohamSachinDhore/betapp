@@ -334,25 +334,15 @@ class DataProcessor:
                         time_entries_by_customer[time_key][entry.number] = 0
                     time_entries_by_customer[time_key][entry.number] += entry.value
             
-            # Save pana entries
-            for entry in pana_entries:
-                date_str = entry.entry_date.isoformat() if isinstance(entry.entry_date, date) else entry.entry_date
-                self.db_manager.update_pana_table_entry(
-                    entry.bazar, date_str, entry.number, entry.value
-                )
-            
+            # PANA entries are automatically handled by the database trigger tr_update_pana_table
+            # No manual updates needed - the trigger handles universal_log → pana_table
             if pana_entries:
-                self.logger.info(f"Updated {len(pana_entries)} pana table entries")
+                self.logger.info(f"Processed {len(pana_entries)} PANA entries via database trigger")
             
-            # Save direct entries to pana table
-            for entry in direct_entries:
-                date_str = entry.entry_date.isoformat() if isinstance(entry.entry_date, date) else entry.entry_date
-                self.db_manager.update_pana_table_entry(
-                    entry.bazar, date_str, entry.number, entry.value
-                )
-            
+            # DIRECT entries are automatically handled by the database trigger tr_update_pana_table_direct
+            # No manual updates needed - the trigger handles universal_log → pana_table
             if direct_entries:
-                self.logger.info(f"Updated {len(direct_entries)} direct entries to pana table")
+                self.logger.info(f"Processed {len(direct_entries)} DIRECT entries via database trigger")
             
             # TYPE entries are automatically handled by the database trigger tr_update_pana_table
             # No manual expansion needed - the calculation engine already created individual universal_log entries

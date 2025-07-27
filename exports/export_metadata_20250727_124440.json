@@ -1,0 +1,10 @@
+{
+  "export_date": "2025-07-27T12:44:40.105819",
+  "data_date": "2025-07-27",
+  "bazar": "T.O",
+  "files": {
+    "universal_log": "exports/universal_log_20250727_124440.csv",
+    "customer_summary": "exports/customer_summary_20250727_20250727_124440.csv",
+    "pana_table_T.O": "exports/pana_table_T.O_20250727_20250727_124440.csv"
+  }
+}
