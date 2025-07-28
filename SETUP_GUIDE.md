@@ -85,6 +85,8 @@ pip install -r requirements.txt
 
 ### Step 5: Initialize Database (First Time Only)
 
+**IMPORTANT**: The setup script creates a **FRESH, EMPTY** database. It does NOT contain any existing data.
+
 Run the database initialization script:
 
 #### Windows:
@@ -96,6 +98,17 @@ python setup_database.py
 ```bash
 python3 setup_database.py
 ```
+
+**What this does:**
+- ✅ Creates a new, empty database
+- ✅ Sets up all required tables (customers, bazars, universal_log, etc.)
+- ✅ Loads initial reference data (bazars, pana numbers, type tables)
+- ✅ Does NOT include any customer data or entries
+
+**If you have existing data:**
+- The script will warn you and create a backup of your existing database
+- Your old data will be saved as `rickymama.db.backup.timestamp`
+- You'll need to manually export/import data if you want to preserve it
 
 ### Step 6: Run the Application
 
@@ -147,6 +160,12 @@ Run the database reset script:
 python setup_database.py --reset
 ```
 
+#### "I lost my data after running setup!"
+The setup script creates a fresh database. Your data is backed up:
+- Look for `rickymama.db.backup.timestamp` in the `data/` folder
+- Copy this file over `rickymama.db` to restore your data
+- Always export your data before running setup scripts
+
 #### Permission denied errors (Linux/macOS)
 ```bash
 chmod +x main_gui_working.py
@@ -164,16 +183,37 @@ chmod +x setup_database.py
 ```
 RickyMama/
 ├── main_gui_working.py     # Main application file
-├── setup_database.py       # Database initialization
+├── setup_database.py       # Database initialization (creates FRESH database)
 ├── requirements.txt        # Python dependencies
 ├── SETUP_GUIDE.md         # This file
 ├── src/                   # Source code modules
-├── data/                  # Database files
+├── data/                  # Database files (contains your data)
 ├── config/                # Configuration files
 ├── docs/                  # Documentation
 ├── exports/               # CSV export files
 └── logs/                  # Application logs
 ```
+
+## 🔄 Moving to a New Computer
+
+### Option 1: Transfer Existing Data
+1. **Export your data** from the old computer using the Export feature
+2. Copy the entire `data/` folder to the new computer
+3. Copy all application files to the new computer
+4. Install dependencies: `pip install -r requirements.txt`
+5. Run the application: `python main_gui_working.py`
+
+### Option 2: Fresh Start
+1. Set up the application on the new computer (follow Steps 1-6 above)
+2. This creates a fresh, empty database
+3. You'll need to re-add customers and re-enter data
+
+### Option 3: Database Transfer
+1. Set up the application on the new computer
+2. Replace the new `data/rickymama.db` with your old database file
+3. Run the application normally
+
+**Recommended**: Use Option 1 (Export + Import) for the safest data transfer.
 
 ## 🔒 Data Safety
 

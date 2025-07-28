@@ -45,16 +45,16 @@ def create_working_main_gui():
         except Exception as e:
             print(f"Error loading the data ({e})")
             # Ensure fallback values are set
-            customers = [{"id": 1, "name": "Default Customer", "commission_type": "commission"}]
-            bazars = [{"name": "default", "display_name": "Default Bazar"}]
+            customers = []
+            bazars = []
 
     except Exception as e:
         print(f"⚠️ Database setup failed: {e}")
         print("🔄 Using fallback mode")
         db_manager = None
         config_manager = None
-        customers = [{"id": 1, "name": "Default Customer", "commission_type": "commission"}]
-        bazars = [{"name": "default", "display_name": "Default Bazar"}]
+        customers = []
+        bazars = []
     
     # Helper functions
     def get_customer_name_color(customer_name: str):
@@ -1453,40 +1453,34 @@ def create_working_main_gui():
                 if db_manager:
                     try:
                         entries = db_manager.get_universal_log_entries(limit=1000)
-                        for entry in entries:
+                        if entries:
+                            for entry in entries:
+                                with dpg.table_row(parent="universal_table"):
+                                    dpg.add_text(str(entry['id']))
+                                    # Apply color coding based on commission type
+                                    customer_color = get_customer_name_color(entry['customer_name'])
+                                    dpg.add_text(entry['customer_name'], color=customer_color)
+                                    dpg.add_text(entry['entry_date'])
+                                    dpg.add_text(entry['bazar'])
+                                    dpg.add_text(str(entry['number']))
+                                    dpg.add_text(f"₹{entry['value']}")
+                                    dpg.add_text(entry['entry_type'])
+                                    dpg.add_text(entry['created_at'])
+                        else:
+                            # No entries found
                             with dpg.table_row(parent="universal_table"):
-                                dpg.add_text(str(entry['id']))
-                                # Apply color coding based on commission type
-                                customer_color = get_customer_name_color(entry['customer_name'])
-                                dpg.add_text(entry['customer_name'], color=customer_color)
-                                dpg.add_text(entry['entry_date'])
-                                dpg.add_text(entry['bazar'])
-                                dpg.add_text(str(entry['number']))
-                                dpg.add_text(f"₹{entry['value']}")
-                                dpg.add_text(entry['entry_type'])
-                                dpg.add_text(entry['created_at'])
+                                dpg.add_text("No entries found - Start by submitting some data", color=(150, 150, 150, 255))
+                                for _ in range(7):
+                                    dpg.add_text("", color=(150, 150, 150, 255))
                     except AttributeError:
-                        # Fallback for mock data
-                        with dpg.table_row(parent="universal_table"):
-                            dpg.add_text("1")
-                            dpg.add_text("Sample Customer")
-                            dpg.add_text(date.today().strftime('%Y-%m-%d'))
-                            dpg.add_text("T.O")
-                            dpg.add_text("128")
-                            dpg.add_text("₹100")
-                            dpg.add_text("PANA")
-                            dpg.add_text(datetime.now().strftime('%Y-%m-%d %H:%M'))
+                        # No data available
+                        pass
                 else:
-                    # No database, show sample row
+                    # No database - show empty table message
                     with dpg.table_row(parent="universal_table"):
-                        dpg.add_text("1")
-                        dpg.add_text("Sample Customer")
-                        dpg.add_text(date.today().strftime('%Y-%m-%d'))
-                        dpg.add_text("T.O")
-                        dpg.add_text("128")
-                        dpg.add_text("₹100")
-                        dpg.add_text("PANA")
-                        dpg.add_text(datetime.now().strftime('%Y-%m-%d %H:%M'))
+                        dpg.add_text("No data available - Database not connected", color=(150, 150, 150, 255))
+                        for _ in range(7):  # Fill remaining columns
+                            dpg.add_text("")
         except Exception as e:
             dpg.set_value("status_text", f"Error refreshing universal log: {e}")
     
@@ -1574,11 +1568,8 @@ def create_working_main_gui():
                         except Exception as e:
                             print(f"Database error: {e}")
                     
-                    # For demo, add some sample values if no real data
-                    if not pana_values:
-                        pana_values[128] = 100
-                        pana_values[129] = 200
-                        pana_values[130] = 150
+                    # Show empty table if no data
+                    # No dummy values added
                     
                     # Get filter values
                     upper_filter = dpg.get_value("pana_upper_value_filter") if dpg.does_item_exist("pana_upper_value_filter") else 0
@@ -1713,9 +1704,9 @@ def create_working_main_gui():
                             else:
                                 # Show empty row if no data
                                 with dpg.table_row(parent="time_table"):
-                                    dpg.add_text("No data")
+                                    dpg.add_text("No time data available for selected filters", color=(150, 150, 150, 255))
                                     for i in range(12):  # Bazar + 10 columns + Total + Date
-                                        dpg.add_text("-")
+                                        dpg.add_text("", color=(150, 150, 150, 255))
                         except Exception as e:
                             print(f"Database error loading time table: {e}")
                             # Show error row
@@ -1852,12 +1843,8 @@ def create_working_main_gui():
                         except Exception as e:
                             print(f"Database error: {e}")
                     
-                    # For demo, add some sample values if no real data
-                    if not jodi_values:
-                        jodi_values[22] = 100
-                        jodi_values[44] = 200
-                        jodi_values[66] = 150
-                        jodi_values[88] = 300
+                    # Show empty table if no data
+                    # No dummy values added
                     
                     # Create 10x10 grid arranged as per user's layout
                     # Row 1: 11, 21, 31, 41, 51, 61, 71, 81, 91, 1
@@ -1950,9 +1937,9 @@ def create_working_main_gui():
                         else:
                             # Show empty row if no data
                             with dpg.table_row(parent="summary_table"):
-                                dpg.add_text("No data for this date")
+                                dpg.add_text("No summary data available for selected date", color=(150, 150, 150, 255))
                                 for i in range(12):  # 11 bazars + Total + Date (now includes K.K)
-                                    dpg.add_text("0")
+                                    dpg.add_text("", color=(150, 150, 150, 255))
                     except Exception as e:
                         print(f"Database error loading summary: {e}")
                         # Show error row

@@ -11,7 +11,7 @@ from ..parsing.type_table_parser import TypeTableLoader
 from ..parsing.pana_parser import PanaValidator
 from ..utils.logger import get_logger
 from ..utils.error_handler import ProcessingError, DatabaseError
-from ..utils.export_manager import ExportManager
+# ExportManager import removed - exports now only happen on user request
 
 @dataclass
 class ProcessingResult:
@@ -90,7 +90,7 @@ class DataProcessor:
         """
         self.db_manager = db_manager
         self.logger = get_logger(__name__)
-        self.export_manager = ExportManager()
+        # Export manager removed - exports now only happen on user request
         
         # Initialize components
         self._initialize_components()
@@ -188,16 +188,9 @@ class DataProcessor:
             # Step 6: Save to specific tables (pana_table, time_table, customer_bazar_summary)
             self._save_to_specific_tables(calculation.universal_entries)
             
-            # Step 7: Export data for backup (optional, non-blocking)
-            try:
-                self.export_manager.export_all_tables(
-                    self.db_manager, 
-                    context.entry_date.isoformat(),
-                    context.bazar
-                )
-                self.logger.info("Data exported successfully for backup")
-            except Exception as e:
-                self.logger.warning(f"Export failed (non-critical): {e}")
+            # Step 7: Export removed - exports should only happen on user request
+            # Previously automatic exports were happening here, which has been removed
+            # to ensure exports only occur when explicitly requested by the user
             
             # Calculate processing time
             processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
