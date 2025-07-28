@@ -37,14 +37,15 @@ def create_working_main_gui():
         print("✅ Database and config initialized")
         
         try:
-            customers = [{"id": row["id"], "name": row["name"]} 
+            customers = [{"id": row["id"], "name": row["name"], 
+                         "commission_type": row["commission_type"] if "commission_type" in row.keys() else "commission"} 
                         for row in db_manager.get_all_customers()]
             bazars = [{"name": row["name"], "display_name": row["display_name"]} 
                      for row in db_manager.get_all_bazars()]
         except Exception as e:
             print(f"Error loading the data ({e})")
             # Ensure fallback values are set
-            customers = [{"id": 1, "name": "Default Customer"}]
+            customers = [{"id": 1, "name": "Default Customer", "commission_type": "commission"}]
             bazars = [{"name": "default", "display_name": "Default Bazar"}]
 
     except Exception as e:
@@ -52,8 +53,38 @@ def create_working_main_gui():
         print("🔄 Using fallback mode")
         db_manager = None
         config_manager = None
-        customers = [{"id": 1, "name": "Default Customer"}]
+        customers = [{"id": 1, "name": "Default Customer", "commission_type": "commission"}]
         bazars = [{"name": "default", "display_name": "Default Bazar"}]
+    
+    # Helper functions
+    def get_customer_name_color(customer_name: str):
+        """Get color for customer name based on commission type"""
+        # Default to blue (commission)
+        default_color = (52, 152, 219, 255)  # Blue
+        
+        try:
+            # Find customer in the customers list
+            for customer in customers:
+                if customer['name'] == customer_name:
+                    commission_type = customer.get('commission_type', 'commission')
+                    if commission_type == 'commission':
+                        return (52, 152, 219, 255)  # Blue
+                    else:
+                        return (230, 126, 34, 255)  # Orange
+            
+            # If not found in memory, try database
+            if db_manager:
+                customer_row = db_manager.get_customer_by_name(customer_name)
+                if customer_row:
+                    commission_type = customer_row['commission_type'] if 'commission_type' in customer_row.keys() else 'commission'
+                    if commission_type == 'commission':
+                        return (52, 152, 219, 255)  # Blue
+                    else:
+                        return (230, 126, 34, 255)  # Orange
+        except Exception as e:
+            print(f"Error getting customer color: {e}")
+        
+        return default_color
     
     # Callback functions
     
@@ -405,12 +436,22 @@ def create_working_main_gui():
             label="Add Customer",
             tag="add_customer_window",
             modal=True,
-            width=300,
-            height=120,
+            width=350,
+            height=180,
             pos=[400, 300]
         ):
             dpg.add_input_text(label="Name", tag="new_customer_input", width=-1)
-            dpg.add_spacer(height=5)
+            dpg.add_spacer(height=10)
+            
+            dpg.add_text("Customer Type:")
+            dpg.add_radio_button(
+                items=["Commission", "Non-Commission"],
+                tag="new_customer_type",
+                default_value="Commission",
+                horizontal=True
+            )
+            dpg.add_spacer(height=10)
+            
             with dpg.group(horizontal=True):
                 dpg.add_button(label="Add", callback=confirm_add_customer, width=100)
                 dpg.add_button(label="Cancel", callback=lambda: dpg.delete_item("add_customer_window"), width=100)
@@ -427,19 +468,23 @@ def create_working_main_gui():
                 dpg.set_value("status_text", "Error: Customer already exists")
                 return
             
+            # Get commission type
+            customer_type = dpg.get_value("new_customer_type")
+            commission_type = "commission" if customer_type == "Commission" else "non_commission"
+            
             if db_manager:
-                customer_id = db_manager.add_customer(name)
+                customer_id = db_manager.add_customer(name, commission_type)
             else:
                 customer_id = len(customers) + 1
             
-            customers.append({"id": customer_id, "name": name})
+            customers.append({"id": customer_id, "name": name, "commission_type": commission_type})
             
             # Update combo
             customer_names = [c["name"] for c in customers]
             dpg.configure_item("customer_combo", items=customer_names, default_value=name)
             
             dpg.delete_item("add_customer_window")
-            dpg.set_value("status_text", f"Customer '{name}' added")
+            dpg.set_value("status_text", f"Customer '{name}' ({customer_type}) added")
             
         except Exception as e:
             dpg.set_value("status_text", f"Add error: {e}")
@@ -754,6 +799,7 @@ def create_working_main_gui():
         ):
             dpg.add_table_column(label="ID", width=60)
             dpg.add_table_column(label="Name", width=200)
+            dpg.add_table_column(label="Type", width=120)
             dpg.add_table_column(label="Created", width=150)
             dpg.add_table_column(label="Last Activity", width=150)
             dpg.add_table_column(label="Total Entries", width=120)
@@ -1318,7 +1364,19 @@ def create_working_main_gui():
                         for customer in db_customers:
                             with dpg.table_row(parent="customers_table"):
                                 dpg.add_text(str(customer['id']))
-                                dpg.add_text(customer['name'])
+                                
+                                # Show commission type and apply color coding
+                                commission_type = customer['commission_type'] if 'commission_type' in customer.keys() else 'commission'
+                                display_type = "Commission" if commission_type == 'commission' else "Non-Commission"
+                                
+                                # Color coding: Blue for Commission, Orange for Non-Commission
+                                if commission_type == 'commission':
+                                    name_color = (52, 152, 219, 255)  # Blue
+                                else:
+                                    name_color = (230, 126, 34, 255)  # Orange
+                                
+                                dpg.add_text(customer['name'], color=name_color)
+                                dpg.add_text(display_type)
                                 dpg.add_text(customer['created_at'])
                                 
                                 # Get customer statistics
@@ -1332,32 +1390,56 @@ def create_working_main_gui():
                                 if stats:
                                     dpg.add_text(stats[0]['last_activity'] or 'Never')
                                     dpg.add_text(str(stats[0]['entries']))
-                                    dpg.add_text(f"₹{stats[0]['total_value']:,}")
+                                    dpg.add_text(f"{stats[0]['total_value']:,}")
                                 else:
                                     dpg.add_text("Never")
                                     dpg.add_text("0")
-                                    dpg.add_text("₹0")
+                                    dpg.add_text("0")
                     except Exception as e:
                         print(f"Error loading customer stats: {e}")
                         # Fallback to simple customer list
                         for customer in customers:
                             with dpg.table_row(parent="customers_table"):
                                 dpg.add_text(str(customer['id']))
-                                dpg.add_text(customer['name'])
+                                
+                                # Show commission type and apply color coding
+                                commission_type = customer['commission_type'] if 'commission_type' in customer.keys() else 'commission'
+                                display_type = "Commission" if commission_type == 'commission' else "Non-Commission"
+                                
+                                # Color coding: Blue for Commission, Orange for Non-Commission
+                                if commission_type == 'commission':
+                                    name_color = (52, 152, 219, 255)  # Blue
+                                else:
+                                    name_color = (230, 126, 34, 255)  # Orange
+                                
+                                dpg.add_text(customer['name'], color=name_color)
+                                dpg.add_text(display_type)
                                 dpg.add_text("2024-01-01")
                                 dpg.add_text("Today")
                                 dpg.add_text("0")
-                                dpg.add_text("₹0")
+                                dpg.add_text("0")
                 else:
                     # Fallback when no database
                     for customer in customers:
                         with dpg.table_row(parent="customers_table"):
                             dpg.add_text(str(customer['id']))
-                            dpg.add_text(customer['name'])
+                            
+                            # Show commission type and apply color coding
+                            commission_type = customer.get('commission_type', 'commission')
+                            display_type = "Commission" if commission_type == 'commission' else "Non-Commission"
+                            
+                            # Color coding: Blue for Commission, Orange for Non-Commission
+                            if commission_type == 'commission':
+                                name_color = (52, 152, 219, 255)  # Blue
+                            else:
+                                name_color = (230, 126, 34, 255)  # Orange
+                            
+                            dpg.add_text(customer['name'], color=name_color)
+                            dpg.add_text(display_type)
                             dpg.add_text("2024-01-01")
                             dpg.add_text("Today")
                             dpg.add_text("0")
-                            dpg.add_text("₹0")
+                            dpg.add_text("0")
         except Exception as e:
             dpg.set_value("status_text", f"Error refreshing customers: {e}")
     
@@ -1374,7 +1456,9 @@ def create_working_main_gui():
                         for entry in entries:
                             with dpg.table_row(parent="universal_table"):
                                 dpg.add_text(str(entry['id']))
-                                dpg.add_text(entry['customer_name'])
+                                # Apply color coding based on commission type
+                                customer_color = get_customer_name_color(entry['customer_name'])
+                                dpg.add_text(entry['customer_name'], color=customer_color)
                                 dpg.add_text(entry['entry_date'])
                                 dpg.add_text(entry['bazar'])
                                 dpg.add_text(str(entry['number']))
@@ -1616,7 +1700,9 @@ def create_working_main_gui():
                                     # Filter by customer if specific customer selected
                                     if customer_value == "All Customers" or entry['customer_name'] == customer_value:
                                         with dpg.table_row(parent="time_table"):
-                                            dpg.add_text(entry['customer_name'])
+                                            # Apply color coding based on commission type
+                                            customer_color = get_customer_name_color(entry['customer_name'])
+                                            dpg.add_text(entry['customer_name'], color=customer_color)
                                             dpg.add_text(bazar_name)
                                             # Columns 1-9, then 0 (as per table header order)
                                             for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]:
@@ -1845,7 +1931,9 @@ def create_working_main_gui():
                                 # Filter by customer if specific customer selected
                                 if customer_value == "All Customers" or entry['customer_name'] == customer_value:
                                     with dpg.table_row(parent="summary_table"):
-                                        dpg.add_text(entry['customer_name'])
+                                        # Apply color coding based on commission type
+                                        customer_color = get_customer_name_color(entry['customer_name'])
+                                        dpg.add_text(entry['customer_name'], color=customer_color)
                                         # Bazar totals in order: T.O, T.K, M.O, M.K, K.O, K.K, NMO, NMK, B.O, B.K
                                         dpg.add_text(f"{entry['to_total']:,}")
                                         dpg.add_text(f"{entry['tk_total']:,}")

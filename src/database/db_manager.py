@@ -170,10 +170,10 @@ class DatabaseManager:
             return cursor.lastrowid
     
     # Customer Operations
-    def add_customer(self, name: str) -> int:
+    def add_customer(self, name: str, commission_type: str = 'commission') -> int:
         """Add a new customer and return their ID"""
-        query = "INSERT INTO customers (name) VALUES (?)"
-        return self.insert_and_get_id(query, (name,))
+        query = "INSERT INTO customers (name, commission_type) VALUES (?, ?)"
+        return self.insert_and_get_id(query, (name, commission_type))
     
     def get_customer_by_name(self, name: str) -> Optional[sqlite3.Row]:
         """Get customer by name"""
